@@ -1,0 +1,49 @@
+services:
+  postgres:
+    image: postgres:latest
+    environment:
+      POSTGRES_USER: sms
+      POSTGRES_PASSWORD: sms
+      POSTGRES_DB: smsdb
+    ports:
+      - "5433:5432"
+
+  redis:
+    image: redis:latest
+    ports:
+      - "6379:6379"
+
+  zookeeper:
+    image: bitnami/zookeeper:3.9
+    environment:
+      ALLOW_ANONYMOUS_LOGIN: "yes"
+    ports:
+      - "2181:2181"
+
+  kafka:
+    image: bitnami/kafka:3.6
+    depends_on:
+      - zookeeper
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_CFG_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_CFG_LISTENERS: INTERNAL://:9093,EXTERNAL://:9092
+      KAFKA_CFG_ADVERTISED_LISTENERS: INTERNAL://kafka:9093,EXTERNAL://localhost:9092
+      KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP: INTERNAL:PLAINTEXT,EXTERNAL:PLAINTEXT
+      KAFKA_CFG_INTER_BROKER_LISTENER_NAME: INTERNAL
+      ALLOW_PLAINTEXT_LISTENER: "yes"
+      KAFKA_CFG_AUTO_CREATE_TOPICS_ENABLE: "false"
+    ports:
+      - "9092:9092"
+      - "9093:9093"
+
+  kafka-init:
+    image: bitnami/kafka:3.6
+    depends_on:
+      - kafka
+    entrypoint: ["/bin/bash", "-c"]
+    command: >
+      "sleep 5 && kafka-topics.sh --bootstrap-server kafka:9093 --create --if-not-exists --topic sms-standard --partitions 6 --replication-factor 1 &&
+       kafka-topics.sh --bootstrap-server kafka:9093 --create --if-not-exists --topic sms-express --partitions 3 --replication-factor 1 &&
+       kafka-topics.sh --bootstrap-server kafka:9093 --create --if-not-exists --topic sms-standard-dlt --partitions 3 --replication-factor 1 &&
+       kafka-topics.sh --bootstrap-server kafka:9093 --create --if-not-exists --topic sms-express-dlt --partitions 3 --replication-factor 1"

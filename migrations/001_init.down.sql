@@ -1,0 +1,5 @@
+DROP TABLE IF EXISTS sms_messages;
+
+DROP TABLE IF EXISTS wallets;
+
+DROP TABLE IF EXISTS customers;
