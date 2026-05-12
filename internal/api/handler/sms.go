@@ -100,11 +100,11 @@ func (h *SmsHandler) ListMessages(c *gin.Context) {
 	}
 
 	filters := &model.SmsReportFilters{CustomerID: customerID}
-	filters.Status = strings.ToUpper(c.Query("status"))
-	filters.Priority = strings.ToUpper(c.Query("priority"))
-	filters.To = c.Query("to")
+	filters.Status = strings.ToUpper(strings.TrimSpace(c.Query("status")))
+	filters.Priority = strings.ToUpper(strings.TrimSpace(c.Query("priority")))
+	filters.To = strings.TrimSpace(c.Query("toNumber"))
 
-	fromStr := c.Query("from")
+	fromStr := strings.TrimSpace(c.Query("from"))
 	if fromStr != "" {
 		parsed, err := time.Parse(time.RFC3339, fromStr)
 		if err != nil {
@@ -114,7 +114,7 @@ func (h *SmsHandler) ListMessages(c *gin.Context) {
 		filters.FromTime = &parsed
 	}
 
-	toStr := c.Query("to")
+	toStr := strings.TrimSpace(c.Query("to"))
 	if toStr != "" {
 		parsed, err := time.Parse(time.RFC3339, toStr)
 		if err != nil {

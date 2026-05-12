@@ -176,7 +176,13 @@ func (s *SmsService) SendSMS(ctx context.Context, customerID string, input *mode
 		if s.logger != nil {
 			s.logger.Error("failed to publish sms event", zap.Error(publishErr))
 		}
-		_ = s.failAndRefund(ctx, msg, "publish failed: "+publishErr.Error())
+		refundErr := s.failAndRefund(ctx, msg, "publish failed: "+publishErr.Error())
+		if refundErr != nil {
+			if s.logger != nil {
+				s.logger.Error("failed to refund after publish error", zap.Error(refundErr))
+			}
+			return nil, errors.Join(publishErr, refundErr)
+		}
 		return nil, publishErr
 	}
 
@@ -217,8 +223,12 @@ func (s *SmsService) failAndRefund(ctx context.Context, msg *model.SmsMessage, r
 	smsRepo := repository.NewSmsRepository(tx)
 	walletRepo := repository.NewWalletRepository(tx)
 
-	_ = smsRepo.MarkFailed(ctx, msg.MessageID, time.Now().UTC(), reason, 0)
-	_, _ = walletRepo.AddBalance(ctx, msg.CustomerID, msg.Cost)
+	if err := smsRepo.MarkFailed(ctx, msg.MessageID, time.Now().UTC(), reason, 0); err != nil {
+		return err
+	}
+	if _, err := walletRepo.AddBalance(ctx, msg.CustomerID, msg.Cost); err != nil {
+		return err
+	}
 
 	return tx.Commit(ctx)
 }

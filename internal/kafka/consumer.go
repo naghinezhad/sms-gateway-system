@@ -84,6 +84,7 @@ func (c *Consumer) Run(ctx context.Context) error {
 					zap.String("consumer_id", c.consumerID),
 					zap.String("message_id", event.MessageID),
 				)
+				time.Sleep(50 * time.Millisecond)
 				shouldCommit = false
 			default:
 				c.logger.Error("failed to process sms event",
