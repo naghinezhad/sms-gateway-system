@@ -72,14 +72,22 @@ All requests must include header: `X-Customer-ID`.
 
 `GET /api/sms?status=SENT&priority=STANDARD&toNumber=+989121234567&from=2026-05-10T00:00:00Z&to=2026-05-11T00:00:00Z&limit=50&offset=0`
 
+## Smoke Test
+
+Run a quick end-to-end smoke test:
+
+```bash
+go test ./tests -run TestSmokeScenario
+```
+
 ## Load Test
 
-Load tests are tagged and run only when explicitly enabled.
+Load tests run only when explicitly enabled with `LOAD_TEST=1`.
 
 Run:
 
 ```bash
-LOAD_TEST=1 go test -tags=loadtest ./tests -run TestHighVolumeScenarios
+LOAD_TEST=1 go test ./tests -run TestHighVolumeScenarios
 ```
 
 Env overrides:
@@ -115,8 +123,19 @@ go run ./cmd/server
 4. Run dispatchers:
 
 ```bash
-DISPATCHER_MODE=standard go run ./cmd/dispatcher
-DISPATCHER_MODE=express go run ./cmd/dispatcher
+DISPATCHER_MODE=all go run ./cmd/dispatcher
+```
+
+5. (Optional) Smoke test:
+
+```bash
+go test ./tests -run TestSmokeScenario
+```
+
+6. (Optional) Load test:
+
+```bash
+LOAD_TEST=1 go test ./tests -run TestHighVolumeScenarios
 ```
 
 ## Configuration
@@ -224,16 +243,27 @@ go run ./cmd/server
 4. اجرای دیسپچرها:
 
 ```bash
-DISPATCHER_MODE=standard go run ./cmd/dispatcher
-DISPATCHER_MODE=express go run ./cmd/dispatcher
+DISPATCHER_MODE=all go run ./cmd/dispatcher
+```
+
+5. (اختیاری) تست سریع:
+
+```bash
+go test ./tests -run TestSmokeScenario
+```
+
+6. (اختیاری) تست بار:
+
+```bash
+LOAD_TEST=1 go test ./tests -run TestHighVolumeScenarios
 ```
 
 ### تست بار
 
-تست بار فقط با برچسب و فعال سازی صریح اجرا می شود.
+تست بار فقط با فعال سازی صریح `LOAD_TEST=1` اجرا می شود.
 
 ```bash
-LOAD_TEST=1 go test -tags=loadtest ./tests -run TestHighVolumeScenarios
+LOAD_TEST=1 go test ./tests -run TestHighVolumeScenarios
 ```
 
 متغیرهای تنظیم:
