@@ -33,6 +33,43 @@ type sendResponse struct {
 	Cost      int64  `json:"cost"`
 }
 
+type messageStatusResponse struct {
+	Status string `json:"status"`
+}
+
+func TestSmokeScenario(t *testing.T) {
+	cfg := loadTestConfigFromEnv()
+	client := &http.Client{Timeout: cfg.Timeout}
+
+	suffix := strconv.FormatInt(time.Now().UnixNano(), 36)
+	customerID := "smoke-" + suffix
+	standardTo := "+98910" + strconv.FormatInt(time.Now().UnixNano()%1000000, 10)
+	expressTo := "+98911" + strconv.FormatInt(time.Now().UnixNano()%1000000, 10)
+
+	createCustomer(t, client, cfg.BaseURL, customerID)
+	mustTopUp(t, client, cfg.BaseURL, customerID, 10)
+
+	start := time.Now().UTC()
+
+	standard := sendOnce(t, client, cfg.BaseURL, customerID, "/api/sms", standardTo, "smoke standard", "smoke-std-"+suffix)
+	express := sendOnce(t, client, cfg.BaseURL, customerID, "/api/sms/express", expressTo, "smoke express", "smoke-exp-"+suffix)
+
+	finalStandard := waitForFinalStatus(t, client, cfg.BaseURL, customerID, standard.MessageID, 6*time.Second)
+	finalExpress := waitForFinalStatus(t, client, cfg.BaseURL, customerID, express.MessageID, 6*time.Second)
+
+	if finalStandard == "" || finalExpress == "" {
+		t.Fatalf("expected final status for both messages")
+	}
+
+	from := start.Add(-1 * time.Minute).Format(time.RFC3339)
+	to := time.Now().UTC().Add(1 * time.Minute).Format(time.RFC3339)
+	query := fmt.Sprintf("/api/sms?from=%s&to=%s&toNumber=%s&limit=10", from, to, url.QueryEscape(standardTo))
+	messages := listMessages(t, client, cfg.BaseURL, customerID, query)
+	if len(messages) == 0 {
+		t.Fatalf("expected at least one message in report")
+	}
+}
+
 func TestHighVolumeScenarios(t *testing.T) {
 	if !loadTestEnabled() {
 		t.Skip("set LOAD_TEST=1 to run load tests")
@@ -267,6 +304,55 @@ func sendOnce(t *testing.T, client *http.Client, baseURL string, customerID stri
 	}
 
 	return resp
+}
+
+func waitForFinalStatus(t *testing.T, client *http.Client, baseURL string, customerID string, messageID string, timeout time.Duration) string {
+	t.Helper()
+
+	deadline := time.Now().Add(timeout)
+	for time.Now().Before(deadline) {
+		status := getMessageStatus(t, client, baseURL, customerID, messageID)
+		switch status {
+		case "SENT", "FAILED":
+			return status
+		case "PENDING", "QUEUED":
+			// keep polling
+		default:
+			return status
+		}
+		time.Sleep(200 * time.Millisecond)
+	}
+
+	t.Fatalf("message %s did not reach final status within %s", messageID, timeout)
+	return ""
+}
+
+func getMessageStatus(t *testing.T, client *http.Client, baseURL string, customerID string, messageID string) string {
+	t.Helper()
+
+	req, err := http.NewRequest(http.MethodGet, baseURL+"/api/sms/"+messageID, nil)
+	if err != nil {
+		t.Fatalf("get message request failed: %v", err)
+	}
+	req.Header.Set("X-Customer-ID", customerID)
+
+	resp, err := client.Do(req)
+	if err != nil {
+		t.Fatalf("get message request failed: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		t.Fatalf("unexpected get status: %d %s", resp.StatusCode, string(body))
+	}
+
+	var msg messageStatusResponse
+	if err := json.NewDecoder(resp.Body).Decode(&msg); err != nil {
+		t.Fatalf("invalid get response: %v", err)
+	}
+
+	return msg.Status
 }
 
 func listMessages(t *testing.T, client *http.Client, baseURL string, customerID string, query string) []map[string]any {
