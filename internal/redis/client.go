@@ -73,6 +73,9 @@ func (r *Redis) AcquireLock(ctx context.Context, key string, ttl time.Duration) 
 		TTL:  ttl,
 	}).Result()
 	if err != nil {
+		if errors.Is(err, goredis.Nil) {
+			return "", nil
+		}
 		return "", err
 	}
 

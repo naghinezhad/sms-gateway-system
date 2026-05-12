@@ -186,8 +186,14 @@ func (s *SmsService) SendSMS(ctx context.Context, customerID string, input *mode
 		return nil, publishErr
 	}
 
-	if err := s.smsRepo.UpdateStatusQueued(ctx, msg.MessageID, time.Now().UTC()); err != nil && s.logger != nil {
-		s.logger.Warn("failed to update queued status", zap.Error(err))
+	queuedAt := time.Now().UTC()
+	if err := s.smsRepo.UpdateStatusQueued(ctx, msg.MessageID, queuedAt); err != nil {
+		if s.logger != nil {
+			s.logger.Warn("failed to update queued status", zap.Error(err))
+		}
+	} else {
+		msg.Status = model.StatusQueued
+		msg.QueuedAt = &queuedAt
 	}
 
 	return msg, nil
